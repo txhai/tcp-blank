@@ -37,8 +37,9 @@ public class PingProvider {
         return end - start;
     }
 
-    // Ip format example: 0.0.0.0:3000
-    public Single<Map<String, Float>> ping(@NonNull final List<String> ipList, final int count) {
+    // Ping each IP n times and get avg
+    // (IP format example: 0.0.0.0:3000)
+    public Single<Map<String, Float>> ping(@NonNull final List<String> ipList, final int pingTimes) {
         return Single.create(emitter -> {
             Map<String, Float> result = new HashMap<>();
             for (final String ip : ipList) {
@@ -52,21 +53,21 @@ public class PingProvider {
                 } catch (Exception ignored) {
                     continue;
                 }
-                float avg = 0;
-                float cnt = 0;
-                for (int i = 0; i < count; i++) {
+                float a = 0;
+                float b = 0;
+                for (int i = 0; i < pingTimes; i++) {
                     try {
-                        avg += pingSingle(parts[0], port, 1000);
-                        cnt++;
+                        a += pingSingle(parts[0], port, 1000);
+                        b++;
                     } catch (Exception e) {
                         Log.e(TAG, e.getMessage());
                     }
                 }
-                if (cnt == 0) {
+                if (b == 0) {
                     result.put(ip, -1f);
                     continue;
                 }
-                result.put(ip, avg / cnt);
+                result.put(ip, a / b);
             }
             emitter.onSuccess(result);
         });
