@@ -1,0 +1,74 @@
+package com.example.app.ping;
+
+import android.util.Log;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.WorkerThread;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
+import io.reactivex.rxjava3.core.Single;
+
+@Singleton
+public class PingProvider {
+    private static final String TAG = "PingProvider";
+
+    @Inject
+    public PingProvider() {
+
+    }
+
+    @WorkerThread
+    private long pingSingle(@NonNull String ip, int port, int timeoutMs) throws IOException {
+        long start = System.currentTimeMillis();
+        Socket socket = new Socket();
+        socket.connect(new InetSocketAddress(ip, port), timeoutMs);
+        socket.close();
+        long end = System.currentTimeMillis();
+        Log.w(TAG, "Pinged " + ip + ":" + port + " -> " + (end - start) + " ms");
+        return end - start;
+    }
+
+    // Ip format example: 0.0.0.0:3000
+    public Single<Map<String, Float>> ping(@NonNull final List<String> ipList, final int count) {
+        return Single.create(emitter -> {
+            Map<String, Float> result = new HashMap<>();
+            for (final String ip : ipList) {
+                final String[] parts = ip.split(":");
+                if (parts.length != 2) {
+                    continue;
+                }
+                final int port;
+                try {
+                    port = Integer.parseInt(parts[1]);
+                } catch (Exception ignored) {
+                    continue;
+                }
+                float avg = 0;
+                float cnt = 0;
+                for (int i = 0; i < count; i++) {
+                    try {
+                        avg += pingSingle(parts[0], port, 1000);
+                        cnt++;
+                    } catch (Exception e) {
+                        Log.e(TAG, e.getMessage());
+                    }
+                }
+                if (cnt == 0) {
+                    result.put(ip, -1f);
+                    continue;
+                }
+                result.put(ip, avg / cnt);
+            }
+            emitter.onSuccess(result);
+        });
+    }
+}
